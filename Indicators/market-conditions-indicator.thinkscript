@@ -1,0 +1,99 @@
+# Green light system
+
+
+# > Tim Vol BarVol ▲/▼ Trig
+
+
+
+
+input showLabels = yes;
+def price = close;
+def emaLengthFast = 10;
+def emaLengthSlow = 34;
+def emaFast = ExpAverage(price, emaLengthFast );
+def emaSlow = ExpAverage(price, emaLengthSlow );
+def currBarClose = close[0];
+def prevBarClose = close[1];
+def currBarHigh = Highest(high[0], 1);
+def prevBarHigh = Highest(high[1], 1);
+def currBarLow = Lowest(low[0], 1);
+def prevBarLow = Lowest(low[1], 1);
+def prevBarRange = prevBarHigh - prevBarLow;
+
+input symbolLong = "▲";
+input symbolShort = "▼";
+input symbolNull = "✖";
+input symbolTriggered = "✓";
+input symbolTime = "🕚";
+input symbolVolume = "★";
+
+# VOLUME ----
+
+def avgVolumeLength = 30;
+def volAvg = Average(volume, avgVolumeLength);
+def todayVolume = volume(period = "DAY");
+def volAvgDaily = Average(todayVolume, avgVolumeLength);
+def prevVolume = volume[1];
+def currVolume = volume[0];
+def prevVolumeAboveAvg = prevVolume > volAvg;
+def currVolumeAboveAvg = currVolume > volAvg;
+def dailyVolumeAboveAvg = todayVolume > (volAvgDaily * 0.8);
+def dailyVolPerc = Round((todayVolume / volAvgDaily) * 100, 0);
+
+AddLabel(yes, "dv: "+  dailyVolPerc+"%", if dailyVolPerc > 60 then color.uptick else if dailyVolPerc < 30 then  color.downtick else color.orange);
+AddLabel(yes,"bv: " +symbolVolume, if !prevVolumeAboveAvg then color.downtick else if prevVolumeAboveAvg and currVolumeAboveAvg then color.uptick else color.orange);
+#AddLabel(yes,symbolVolume, if !prevVolumeAboveAvg then  color.downtick else if prevVolumeAboveAvg and currVolumeAboveAvg then color.uptick else color.orange);
+#AddLabel(yes,symbolTime, Color.gray);
+
+# TIME --------------------------------
+# is time between morning session or afternoon session.
+input morningBegin = 0931;
+input morningEnd   = 1005;
+input afternoonBegin = 1330;
+input afternoonEnd   = 1405;
+def afternoonSession =  SecondsFromTime(afternoonBegin) >= 0 and SecondsTillTime(afternoonEnd) >= 0;
+def morningSession =  SecondsFromTime(morningBegin) >= 0 and SecondsTillTime(morningEnd) >= 0;
+def inSession = afternoonSession or morningSession;
+def secondStillTradeable = if afternoonSession then SecondsTillTime(afternoonEnd) else if morningSession then SecondsTillTime(afternoonEnd) else 0;
+def minutesleft = secondStillTradeable / 60;
+# TIME LABEL
+AddLabel(yes,symbolTime, if morningSession or afternoonSession then Color.DOWNTICK else Color.uptick);
+
+# CLEARED --------------------------------
+# CalcPOC ----------------------
+def yyyymmdd = getYyyyMmDd();
+def seconds = secondsFromTime(0);
+def month = getYear() * 12 + getMonth();
+def day_number = daysFromDate(first(yyyymmdd)) + getDayOfWeek(first(yyyymmdd));
+def dom = getDayOfMonth(yyyymmdd);
+def dow = getDayOfWeek(yyyymmdd - dom + 1);
+def expthismonth = (if dow > 5 then 27 else 20) - dow;
+def exp_opt = month + (dom > expthismonth);
+def period = countTradingDays(min(first(yyyymmdd), yyyymmdd), yyyymmdd) - 1;
+def count = CompoundValue(1, if period != period[1] then (count[1] + period - period[1]) % 1 else count[1], 0);
+
+def cond = count < count[1] + period - period[1];
+
+profile vol = volumeProfile("startNewProfile" = cond,"numberOfProfiles" = 1000,"onExpansion"= no, "pricePerRow" = PricePerRow.TICKSIZE);
+
+def con = compoundValue(1, yes, no);
+def poc = if IsNaN(vol.getPointOfControl()) and con then poc[1] else vol.getPointOfControl();
+
+# previous close is above ema & POC
+def clearedLong = (prevBarClose > poc) and (prevBarClose > emaSlow);
+# previous close is below ema & POC
+def clearedShort = (prevBarClose < poc) and (prevBarClose < emaSlow);
+# CLEARED LABEL
+AddLabel(yes, (if clearedLong then symbolLong else if clearedShort then symbolShort else symbolNull )  , (if !clearedshort and !clearedLong then Color.Downtick else if (clearedshort or clearedLong) then Color.UPTICK else color.ORANGE));
+
+# TRIGGER --------------------------------
+def triggeredDown = clearedShort and (currBarLow < prevBarLow);
+def triggeredUp = clearedLong and (currBarHigh > prevBarHigh);
+input triggerWarning = 0.5;
+def closeToTriggerAmount = prevBarRange / triggerWarning;
+def triggerRangeHigh = prevBarHigh - close;
+def triggerRangeLow = close - prevBarLow;
+def triggerClose = (clearedLong and (triggerRangeHigh < closeToTriggerAmount)) or (clearedShort and (triggerRangeLow < closeToTriggerAmount));
+# TRIGGER LABEL
+AddLabel(yes, symbolTriggered  , (if (!clearedshort and !clearedLong) then Color.Downtick else if (triggeredDown or triggeredUP) then color.UPTICK else if triggerClose then Color.ORANGE else color.gray));
+

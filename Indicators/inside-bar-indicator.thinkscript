@@ -1,0 +1,12 @@
+def lowVol = (VolatilityStdDev(6) / VolatilityStdDev(100)) < 0.5;
+def insideDay = high < high[1] and low > low[1];
+def range = high - low;
+def NR4 = range < Lowest(range[1], 3);
+plot signal = lowVol and insideDay and NR4;
+plot signal2 = lowVol and insideDay and NR4;
+     signal.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
+     signal.SetDefaultColor(Color.MAGENTA);
+     signal.SetLineWeight(1);
+signal2.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
+     signal2.SetDefaultColor(Color.MAGENTA);
+     signal2.SetLineWeight(1);

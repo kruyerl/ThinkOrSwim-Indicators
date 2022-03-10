@@ -1,0 +1,27 @@
+input displayLabel = yes;
+def AccountNetLiq = GetNetLiq();
+input riskPercent = 0.5;
+input fallbackRisk = 5;
+
+
+def riskCalc = Round(AccountNetLiq * (riskPercent/100),0);
+# check if risk is NaN and display fallback if needed    
+def risk = if IsNaN(AccountNetLiq) == 0 then riskCalc else fallbackRisk; 
+
+def prevLowValue = Lowest(low[1], 1);
+def prevHighValue = Highest(high[1], 1);
+def prevRangeValue = prevHighValue - prevLowValue;
+def prevShareValue =  Round(risk / prevRangeValue, 0) ;
+def prevPositionCost = prevHighValue * prevShareValue;
+
+def currLowValue = Lowest(low[0], 1);
+def currHighValue = Highest(high[0], 1);
+def currRangeValue = currHighValue - currLowValue;
+def currShareValue =  Round(risk / currRangeValue, 0) ;
+def currPositionCost = currHighValue * currShareValue;
+
+AddLabel(displayLabel, "  Risk: " + AsText( risk, NumberFormat.DOLLAR) + "  ", Color.GRAY) ;
+
+AddLabel(displayLabel, "  Pre:  " + Round( prevShareValue, 0) + " over " + AsText( prevHighValue, NumberFormat.DOLLAR)  + " -"+ AsText( prevRangeValue, NumberFormat.DOLLAR) +"  (" + AsText( prevPositionCost, NumberFormat.DOLLAR) + ")   ", Color.GRAY);
+
+AddLabel(displayLabel, "  Cur:  " + Round( currShareValue, 0) + " over " + AsText( currHighValue, NumberFormat.DOLLAR)  + " -"+ AsText( currRangeValue, NumberFormat.DOLLAR) +"  (" + AsText( currPositionCost, NumberFormat.DOLLAR) + ")   ", Color.GRAY);

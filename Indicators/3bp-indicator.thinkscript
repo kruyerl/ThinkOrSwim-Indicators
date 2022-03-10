@@ -1,0 +1,194 @@
+# based on Live Traders video https://www.youtube.com/watch?v=xEjUd82NVVg
+
+# Magenta arrow = potential pattern forming
+# White arrow   = confirmed (trigger bar high broke the high of ignitor and pause bars)
+
+# Official Criteria:
+# 1st bar ("ignitor") spike in price, range, maybe volume & 1st or 2nd bar of a move
+# 1st bar not in middle of an uptrend
+# 1st bar should be above resistance (closes above recent high)
+# middle bar/bars ("pause") low is above midpoint of 1st bar
+# middle bar/bars high is near 1st bar high
+# middle bar/bars can be green or red
+# trigger bar (potential) low is greater than low of middle bar/bars
+# trigger bar (confirmed) high is above the high of the ingnitor and middle bars
+
+
+# Inputs are asked for bullish mode, and will be reversed automatically for bearish
+input Mode = {default "Both", "Bullish", "Bearish"};
+input Show_Arrows_Potential = no;      # ignitor and pause bars match pattern, trigger has potential
+input Show_Arrows_Confirmed = no;      # trigger bar successfully crossed previous bars high
+input Color_Bars_Potential  = yes;      # ignitor and pause bars match pattern, trigger has potential
+input Color_Bars_Confirmed  = yes;      # trigger bar successfully crossed previous bars high
+input Flash_Background_Start = {default "Off", "Ignitor", "Pause Bars", "Trigger"};   # BG color change starting with selected bar match
+input trigger_Bar_Low_Min = {default "Official", "Relaxed"};   # Trigger bar low min based on pause bars low (official), or pause bars minimum
+input Show_During_Trend = yes;          # Strict pattern not supposed to be in middle of uptrend
+input trend_Limit_Perc_Chg = 1.0;       # Only used if Show_During_Trend = no (Still signal if uptrend is below % entered)
+input trend_LookBack = 10;              # Only used if Show_During_Trend = no
+input prev_High_LookBack = 5;           # Ignitor bar must break previous period high
+input avg_Vol_LookBack = 10;            # for qualifying ignitor bar
+input avg_Range_LookBack = 10;          # for qualifying ignitor bar
+input ignitor_Range_Spike_Perc = 200;   # Minimum ignitor range % relative to avg range (200% = 2x avg range)
+input ignitor_Vol_Spike_Perc = 100;     # Minimum volume % relative to avg volume
+input pause_Low_Min_Perc_Bull  = 45;    # Pause bars low min % of ignitor bar range (50% = middle of ingitor bar, lower is looser)
+input pause_High_Min_Perc_Bull = 80;    # Pause bars high min % of ignitor bar range (90% recommended, lower is looser)
+input pause_High_max_Perc_Bull = 110;   # Pause bars high max % of ignitor bar range (110% recommended, higher is looser)
+
+Assert(prev_High_LookBack >= 1, "prev_High_Low_LookBack must be greater than zero");
+Assert(trend_LookBack >= 1, "trend_LookBack must be greater than zero");
+Assert(avg_Vol_LookBack >= 1, "avg_Vol_LookBack must be greater than zero");
+Assert(avg_Range_LookBack >= 1, "avg_Range_LookBack must be greater than zero");
+Assert(ignitor_Range_Spike_Perc >= 110, "ignitor_Range_Spike_Perc must be greater than 110%");
+Assert(pause_Low_Min_Perc_Bull >= 0, "pause_Low_Min_Perc_Bull must be greater than zero");
+Assert(pause_High_Min_Perc_Bull >= pause_Low_Min_Perc_Bull, "pause_High_Min_Perc_Bull must be greater than pause_Low_Min_Perc_Bull");
+Assert(pause_High_max_Perc_Bull >= 100, "pause_High_max_Perc_Bull must be greater than or equal to 100%");
+
+def indMode;
+switch (Mode) {
+case "Both":    indMode = 1;
+case "Bullish": indMode = 2;
+case "Bearish": indMode = 3; }
+
+def showBull = indMode == 1 or indMode == 2;
+def showBear = indMode == 1 or indMode == 3;
+
+def triggerMode;
+switch (trigger_Bar_Low_Min) {
+case "Official": triggerMode = 1;
+case "Relaxed":  triggerMode = 2; }
+
+def flashBGMode;
+switch (Flash_Background_Start) {
+case "Off":        flashBGMode = 1;
+case "Ignitor":    flashBGMode = 2;
+case "Pause Bars": flashBGMode = 3;
+case "Trigger":    flashBGMode = 4; }
+
+def start = 0930;
+def end = 1600;
+def pre = secondsTillTime(start) > 0;
+def regHrs = secondsfromtime(start) >= 0 and secondsTillTime(end) > 0;
+def AH =  secondsfromtime(end) >= 0;
+def tLookback = max(1, rounddown(trend_LookBack / 2, 0));
+def tLookbackRecent = max(1, rounddown(trend_LookBack / 4, 0));
+def trendLimMult = 1 + (trend_Limit_Perc_Chg * .01);
+def h = high;
+def l = low;
+def o = open;
+def c = close;
+def v = volume;
+def liveBar = isNaN(c[-1]);
+def upBar = o < c;
+def downBar = o > c;
+def range = h - l;
+def avgRange = ATR(avg_Range_LookBack);
+def avgVol = Average(v, avg_Vol_LookBack);
+def hh = Highest(h, prev_High_LookBack);
+def ll = Lowest(l, prev_High_LookBack);
+
+def movAvg = MovingAverage(AverageType.SIMPLE, c, tLookback);
+def movAvgRecent = MovingAverage(AverageType.SIMPLE, c, tLookbackRecent);
+
+def diffTimeZone1 = (pre and !pre[tLookback * 2]) or (regHrs and !regHrs[tLookback * 2]) or (AH and !AH[tLookback * 2]);
+def diffTimeZone2 = (pre and !pre[tLookbackRecent * 2]) or (regHrs and !regHrs[tLookbackRecent * 2]) or (AH and !AH[tLookbackRecent * 2]);
+
+def notUptrend1 = diffTimeZone1 or (movAvg <= movAvg[tLookback] * trendLimMult);
+def notUptrend2 = diffTimeZone2 or (movAvgRecent <= movAvgRecent[tLookbackRecent] * trendLimMult);
+def notUptrend = Show_During_Trend or (notUptrend1 and notUptrend2);
+
+def notDntrend1 = diffTimeZone1 or (movAvg >= movAvg[tLookback] * trendLimMult);
+def notDntrend2 = diffTimeZone2 or (movAvgRecent >= movAvgRecent[tLookbackRecent] * trendLimMult);
+def notDntrend = Show_During_Trend or (notDntrend1 and notDntrend2);
+
+def bullIgnitorMinHigh = max(hh[1] , h[1] + (range[1] * (ignitor_Range_Spike_Perc - 100) * .01 * .7));
+def bull_ignitor_bar = upBar and notUptrend[1] and h >= bullIgnitorMinHigh and range > range[1] and range >= avgRange[1] * ignitor_Range_Spike_Perc * .01 and v >= avgVol[1] * ignitor_Vol_Spike_Perc *.01;
+
+def bearIgnitorLowMax = min(ll[1] , l[1] - (range[1] * (ignitor_Range_Spike_Perc - 100) * .01 * .7));
+def bear_ignitor_bar = downBar and notDntrend[1] and l <= bearIgnitorLowMax and range > range[1] and range >= avgRange[1] * ignitor_Range_Spike_Perc * .01 and v >= avgVol[1] * ignitor_Vol_Spike_Perc *.01;
+
+
+def bullPauseLowMin = l + (range * pause_Low_Min_Perc_Bull * .01);
+def bullPauseHighMin = l + (range * pause_High_Min_Perc_Bull * .01);
+def bullPauseHighMax = l + (range * pause_High_max_Perc_Bull * .01);
+def bull_pause_bar1 = bull_ignitor_bar[1] and l >= bullPauseLowMin[1] and h <= bullPauseHighMax[1] and h >= bullPauseHighMin[1];
+def bull_pause_bar2 =  bull_pause_bar1[1] and l >= bullPauseLowMin[2] and h <= bullPauseHighMax[2] and h >= bullPauseHighMin[2];
+
+def bearPauseHighMax = h - (range * pause_Low_Min_Perc_Bull * .01);
+def bearPauseLowMax = h - (range * pause_High_Min_Perc_Bull * .01);
+def bearPauseLowMin = h - (range * pause_High_max_Perc_Bull * .01);
+def bear_pause_bar1 = bear_ignitor_bar[1] and h <= bearPauseHighMax[1] and l >= bearPauseLowMin[1] and l <= bearPauseLowMax[1];
+def bear_pause_bar2 =  bear_pause_bar1[1] and h <= bearPauseHighMax[2] and l >= bearPauseLowMin[2] and l <= bearPauseLowMax[2];
+
+
+def bull_potential_3BP = bull_pause_bar1[1] and range > 0 and if triggerMode == 1 then l >= l[1] else l >= bullPauseLowMin[2];
+def bull_confirmed_3BP = bull_potential_3BP and h > Max(h[1], h[2]);
+def bull_potential_4BP = bull_pause_bar2[1] and range > 0 and if triggerMode == 1 then l >= min(l[1], l[2]) else l >= bullPauseLowMin[3];
+def bull_confirmed_4BP = bull_potential_4BP and h > Max(Max(h[1], h[2]), h[3]);
+
+def bear_potential_3BP = bear_pause_bar1[1] and range > 0 and if triggerMode == 1 then h <= h[1] else h <= bearPauseHighMax[2];
+def bear_confirmed_3BP = bear_potential_3BP and l < min(l[1], l[2]);
+def bear_potential_4BP = bear_pause_bar2[1] and range > 0 and if triggerMode == 1 then h <= max(h[1], h[2]) else h <= bearPauseHighMax[3];
+def bear_confirmed_4BP = bear_potential_4BP and l < min(min(l[1], l[2]), l[3]);
+
+
+# The 3rd bar can be both pause_bar2 and 3BP trigger bar at same time
+def bull_show_confirmed = bull_confirmed_3BP or bull_confirmed_4BP;
+def bull_show_potential = (bull_potential_3BP or bull_potential_4BP) and liveBar;
+def bull_show_pause2  = bull_pause_bar2 and (if liveBar then 1 else (bull_potential_4BP[-1] and liveBar[-1]) or bull_confirmed_4BP[-1]);
+def bull_show_pause1  = bull_pause_bar1 and (if liveBar then 1 else bull_show_pause2[-1] or (bull_potential_3BP[-1] and liveBar[-1]) or bull_confirmed_3BP[-1]);
+def bull_show_ignitor = bull_ignitor_bar and (if liveBar then 1 else bull_show_pause1[-1]);
+
+def bear_show_confirmed = bear_confirmed_3BP or bear_confirmed_4BP;
+def bear_show_potential = (bear_potential_3BP or bear_potential_4BP) and liveBar;
+def bear_show_pause2  = bear_pause_bar2 and (if liveBar then 1 else (bear_potential_4BP[-1] and liveBar[-1]) or bear_confirmed_4BP[-1]);
+def bear_show_pause1  = bear_pause_bar1 and (if liveBar then 1 else bear_show_pause2[-1] or (bear_potential_3BP[-1] and liveBar[-1]) or bear_confirmed_3BP[-1]);
+def bear_show_ignitor = bear_ignitor_bar and (if liveBar then 1 else bear_show_pause1[-1]);
+
+
+plot confirmed_arrows_bull = showBull and Show_Arrows_Confirmed and bull_show_confirmed;
+plot potential_arrows_bull = showBull and Show_Arrows_Potential and (bull_show_ignitor or bull_show_pause1 or bull_show_pause2 or bull_show_potential);
+
+plot confirmed_arrows_bear = showBear and Show_Arrows_Confirmed and bear_show_confirmed;
+plot potential_arrows_bear = showBear and Show_Arrows_Potential and (bear_show_ignitor or bear_show_pause1 or bear_show_pause2 or bear_show_potential);
+
+def paintPotentialBull = showBull and Color_Bars_Potential and (bull_show_ignitor or bull_show_pause1 or bull_show_pause2 or bull_show_potential);
+def paintConfirmedBull = showBull and Color_Bars_Confirmed and bull_show_confirmed;
+
+def paintPotentialBear = showBear and Color_Bars_Potential and (bear_show_ignitor or bear_show_pause1 or bear_show_pause2 or bear_show_potential);
+def paintConfirmedBear = showBear and Color_Bars_Confirmed and bear_show_confirmed;
+
+def flashBGbull = showBull and
+                if flashBGMode == 2 then (bull_show_ignitor or bull_show_pause1 or bull_show_pause2 or bull_show_potential or bull_show_confirmed) else
+                if flashBGMode == 3 then (bull_show_pause1 or bull_show_pause2 or bull_show_potential or bull_show_confirmed) else
+                if flashBGMode == 4 then (bull_show_potential or bull_show_confirmed) else 0;
+
+def flashBGbear = showBear and
+                if flashBGMode == 2 then (bear_show_ignitor or bear_show_pause1 or bear_show_pause2 or bear_show_potential or bear_show_confirmed) else
+                if flashBGMode == 3 then (bear_show_pause1 or bear_show_pause2 or bear_show_potential or bear_show_confirmed) else
+                if flashBGMode == 4 then (bear_show_potential or bear_show_confirmed) else 0;
+
+
+#####  COLORS AND STYLE  #####
+confirmed_arrows_bull.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
+confirmed_arrows_bull.SetDefaultColor(Color.WHITE);
+confirmed_arrows_bull.SetLineWeight(3);
+
+potential_arrows_bull.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
+potential_arrows_bull.SetDefaultColor(Color.MAGENTA);
+potential_arrows_bull.SetLineWeight(3);
+
+confirmed_arrows_bear.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
+confirmed_arrows_bear.SetDefaultColor(Color.WHITE);
+confirmed_arrows_bear.SetLineWeight(3);
+
+potential_arrows_bear.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
+potential_arrows_bear.SetDefaultColor(Color.MAGENTA);
+potential_arrows_bear.SetLineWeight(3);
+
+assignPriceColor(if paintPotentialBull then if c < o  then Color.MAGENTA else createColor(200,255,20) else color.CURRENT);
+assignPriceColor(if paintConfirmedBull then if c < o  then Color.MAGENTA else createColor(200,255,20) else color.CURRENT);
+assignPriceColor(if paintPotentialBear then if c <= o then Color.MAGENTA else createColor(200,255,20) else color.CURRENT);
+assignPriceColor(if paintConfirmedBear then if c <= o then Color.MAGENTA else createColor(200,255,20) else color.CURRENT);
+
+assignBackgroundColor(if flashBGbull then color.LIGHT_GRAY else color.current);
+assignBackgroundColor(if flashBGbear then color.LIGHT_GRAY else color.current);

@@ -1,0 +1,58 @@
+input s1 = 0.0;
+input s2 = 0.0;
+input s3 = 0.0;
+input s4 = 0.0;
+input s5 = 0.0;
+input r1 = 0.0;
+input r2 = 0.0;
+input r3 = 0.0;
+input r4 = 0.0;
+input r5 = 0.0;
+
+def nextSupport;
+def nextResistance;
+def vClose = close;
+def nan = double.NaN;
+def highestClose = HighestAll(if IsNaN(vClose[-1]) then vClose else nan);
+if highestClose < r5 and highestClose > r4 then {
+    nextSupport = r4;
+    nextResistance = r5;
+ } else if highestClose < r4 and highestClose > r3 then {
+    nextSupport = r3;
+    nextResistance = r4;
+ } else if highestClose < r3 and highestClose > r2 then {
+    nextSupport = r2;
+    nextResistance = r3;
+ } else if highestClose < r2 and highestClose > r1 then {
+    nextSupport = r1;
+    nextResistance = r2;
+ } else if highestClose < r1 and highestClose > s1 then {
+    nextSupport = s1;
+    nextResistance = r1;
+ } else if highestClose < s1 and highestClose > s2 then {
+    nextSupport = s2;
+    nextResistance = s1;
+ } else if highestClose < s2 and highestClose > r3 then {
+    nextSupport = s3;
+    nextResistance = s2;
+ } else if highestClose < s3 and highestClose > r4 then {
+    nextSupport = s4;
+    nextResistance = s3;
+ } else if highestClose < s4 and highestClose > r5 then {
+    nextSupport = s4;
+    nextResistance = s5;
+ } else {
+    nextSupport = 0;
+    nextResistance = 0;
+ };
+
+AddLabel(yes, "  highestClose:  " + highestClose + "  nextSupport:  " + nextSupport + "  nextResistance:  " + nextResistance + "  ",  Color.GRAY );
+plot SupportLine = nextSupport;
+SupportLine.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+SupportLine.SetDefaultColor(Color.uptick);
+SupportLine.SetLineWeight(1);
+
+plot ResistanceLine = nextResistance;
+ResistanceLine.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+ResistanceLine.SetDefaultColor(Color.downtick);
+ResistanceLine.SetLineWeight(1);

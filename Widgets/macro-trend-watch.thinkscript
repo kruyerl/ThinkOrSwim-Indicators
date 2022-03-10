@@ -1,0 +1,9 @@
+def macroEMA= ExpAverage(close, 34);
+def microEMA= ExpAverage(close, 9);
+
+def macroBullish = microEMA > macroEMA;
+def macroBearish = microEMA < macroEMA;
+
+ADDlabel(macroBullish, "▲", color.uptick);
+ADDlabel(macroBearish, "▼", color.downtick);
+ADDlabel(!macroBullish and!macroBearish, "", color.black);

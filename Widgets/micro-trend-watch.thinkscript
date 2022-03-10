@@ -1,0 +1,9 @@
+def microEMA= ExpAverage(close, 9);
+def mark = close;
+
+def microBullish = mark > microEMA;
+def microBearish = mark < microEMA;
+
+ADDlabel(microBullish, "▲", color.uptick);
+ADDlabel(microBearish, "▼", color.downtick);
+ADDlabel(!microBullish and!microBearish, "", color.black);
